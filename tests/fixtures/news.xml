@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0"><channel><title>"Acme" - Google News</title>
+<item><title>Acme expande frota - Jornal X</title><link>https://news.example/1</link>
+<pubDate>Wed, 24 Sep 2026 10:00:00 GMT</pubDate><source url="https://jornalx.com">Jornal X</source></item>
+<item><title>Acme contrata</title><link>https://news.example/2</link><pubDate>Tue, 23 Sep 2026 09:00:00 GMT</pubDate></item>
+</channel></rss>

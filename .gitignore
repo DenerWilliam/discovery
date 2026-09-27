@@ -1,0 +1,18 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# Discovery reports (dados de clientes) - só na raiz do projeto, não em src/discovery/
+/reports/
+/discovery/
+
+# Configuração de clientes reais (nome, site, CNPJ) - só o modelo fica versionado
+/clients/*.yaml
+!/clients/exemplo.yaml

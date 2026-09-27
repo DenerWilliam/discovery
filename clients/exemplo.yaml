@@ -1,0 +1,22 @@
+# Modelo de configuração de cliente. Copie este arquivo para <id>.yaml
+# (o nome do arquivo, sem extensão, é o <id> usado em --client <id> e em /discovery <id>)
+# e preencha com o que você já sabe do cliente antes de rodar a primeira coleta.
+
+name: Nome do Cliente     # obrigatório: razão social ou nome fantasia
+site: https://www.exemplo.com.br/   # obrigatório: site oficial do cliente
+
+# cnpj: "00.000.000/0001-00"
+# Opcional. Se não informar, o CLI procura um CNPJ válido no texto do site.
+# Informe quando já souber, ou se o site citar mais de um CNPJ válido
+# (nesse caso a coleta marca a fonte como "ambigua" e não consulta nada
+# até você informar o CNPJ aqui ou por --cnpj).
+
+# queries:
+#   - '"{name}"'
+#   - '"{name}" reclame aqui'
+# Opcional. {name} vira o nome do cliente. Sem esta lista, a query padrão
+# é só '"{name}"' entre aspas — buscadores automatizados degradam com
+# termos extras. Acrescente outras só se souber que funcionam bem.
+
+# max_pages: 15
+# Opcional. Teto de páginas do site visitadas na varredura (padrão: 15).
