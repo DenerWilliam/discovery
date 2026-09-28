@@ -24,12 +24,12 @@ Precisa também de `pdftotext`, `pandoc` e `soffice` (LibreOffice) instalados no
 Copie `clients/exemplo.yaml` para `clients/<id>.yaml` (o `<id>` é o nome do arquivo, sem extensão — vira o valor de `--client <id>` e de `/discovery <id>`) e preencha com o que você já sabe do cliente:
 
 ```bash
-cp clients/exemplo.yaml clients/haix.yaml
+cp clients/exemplo.yaml clients/cliente-x.yaml
 ```
 
 ```yaml
-name: Haix Rental
-site: https://www.haixrental.com.br/
+name: Cliente X
+site: https://www.clientex.com.br/
 cnpj: "00.000.000/0001-00"   # opcional; se ausente, o CLI procura no site
 queries:                     # opcional; {name} vira o nome do cliente (padrão: só "{name}")
   - '"{name}" reclame aqui'
@@ -42,13 +42,13 @@ max_pages: 15                # opcional
 
 ```bash
 # Com arquivo de cliente
-uv run discovery scan --client haix
+uv run discovery scan --client cliente-x
 
 # Sem arquivo
 uv run discovery scan --name "Cliente X" --site https://exemplo.com.br [--cnpj 11.222.333/0001-81]
 
 # Só conferir a configuração resolvida, sem coletar
-uv run discovery scan --client haix --dry-run
+uv run discovery scan --client cliente-x --dry-run
 ```
 
 Outras opções: `--query '"{name}" vagas'` (repetível), `--max-pages N`, `--reports-dir`, `--clients-dir`.
@@ -66,7 +66,7 @@ Essa etapa não interpreta nada — quem faz isso é a etapa 2, no Claude Code.
 Dentro deste repositório, no Claude Code:
 
 ```
-/discovery haix
+/discovery cliente-x
 ```
 
 Isso lê a coleta mais recente do cliente (sem acessar a web de novo) e grava, em `discovery/<cliente>/`:
@@ -75,7 +75,7 @@ Isso lê a coleta mais recente do cliente (sem acessar a web de novo) e grava, e
 
 Use `--sem-perguntas` se quiser só o relatório. Peça "só o roteiro" se quiser gerar de novo apenas o roteiro a partir do relatório mais recente.
 
-Se ainda não rodou a coleta, peça para o Claude coletar (`/discovery haix --nova`, ou diga o nome e o site do cliente em linguagem natural, inclusive o CNPJ se tiver).
+Se ainda não rodou a coleta, peça para o Claude coletar (`/discovery cliente-x --nova`, ou diga o nome e o site do cliente em linguagem natural, inclusive o CNPJ se tiver).
 
 ### 5. Levar o roteiro para a reunião
 
@@ -94,7 +94,7 @@ Nome sugerido (não obrigatório): `AAAA-MM-DD-<tipo>-<assunto>.<ext>`, com tipo
 Depois, no Claude Code:
 
 ```
-/discovery haix --cruzar
+/discovery cliente-x --cruzar
 ```
 
 Isso gera `discovery/<cliente>/cruzamento-<carimbo>.md` — **sempre um arquivo novo**, sem tocar no relatório, no roteiro nem nos documentos. O documento traz:
@@ -122,7 +122,8 @@ Carimbado, nunca sobrescrito (nova versão é sempre um arquivo novo) e citando 
 ## Estrutura de pastas
 
 ```
-clients/<id>.yaml                       # configuração do cliente (versionado)
+clients/exemplo.yaml                    # modelo, versionado
+clients/<id>.yaml                       # configuração de cada cliente real (gitignored)
 
 reports/<carimbo>-<cliente>/            # etapa 1: dados brutos (gitignored)
   raw.json
@@ -137,7 +138,7 @@ discovery/<cliente>/                    # etapas 2 e 3: o que se lê e se compar
   <tipo-descritivo>-<carimbo>.md        # outros materiais (cotação, resumo, ...)
 ```
 
-`reports/` e `discovery/` ficam fora do git — contêm dados de clientes, inclusive nomes de sócios.
+`reports/`, `discovery/` e `clients/*.yaml` (exceto `exemplo.yaml`) ficam fora do git — contêm dados de clientes, inclusive nomes de sócios e CNPJ.
 
 ## Testes
 
