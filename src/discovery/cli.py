@@ -17,6 +17,7 @@ from discovery.collectors.site import collect_site
 from discovery.collectors.sitemap import collect_sitemap
 from discovery.collectors.tecnologia import collect_tecnologia
 from discovery.config import ConfigError, load_config
+from discovery.contatos import ContatosError, export, find_latest_ajustes, find_latest_run
 from discovery.models import OK
 from discovery.storage import write_run
 
@@ -42,7 +43,32 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--clients-dir", type=Path, default=Path("clients"))
     scan.add_argument("--reports-dir", type=Path, default=Path("reports"))
     scan.add_argument("--dry-run", action="store_true", help="só resolve a configuração e sai")
+    contatos = sub.add_parser(
+        "contatos", help="Gera o CSV de contatos (res.partner) para importar no Odoo.")
+    contatos.add_argument("--client", required=True, help="id do cliente")
+    contatos.add_argument("--run", type=Path, help="pasta da execução (padrão: a mais recente)")
+    contatos.add_argument("--ajustes", type=Path,
+                          help="arquivo de ajustes (padrão: o contatos-ajustes-*.yaml mais recente)")
+    contatos.add_argument("--reports-dir", type=Path, default=Path("reports"))
+    contatos.add_argument("--out-dir", type=Path, default=Path("discovery"),
+                          help="pasta base dos materiais (saída em <out-dir>/<cliente>/)")
     return parser
+
+
+def run_contatos(args: argparse.Namespace) -> int:
+    out_dir = args.out_dir / args.client
+    try:
+        run = args.run or find_latest_run(args.reports_dir, args.client)
+        ajustes = args.ajustes or find_latest_ajustes(out_dir)
+        path, result = export(run, out_dir, ajustes)
+    except ContatosError as exc:
+        print(f"Erro: {exc}", file=sys.stderr)
+        return 1
+    for aviso in result.avisos:
+        print(f"Aviso: {aviso}", file=sys.stderr)
+    print(f"{path} ({result.contatos} contatos; base: {run}; "
+          f"ajustes: {ajustes if ajustes else 'nenhum'})")
+    return 0
 
 
 def run_scan(args: argparse.Namespace) -> int:
@@ -98,4 +124,4 @@ def run_scan(args: argparse.Namespace) -> int:
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
-    sys.exit(run_scan(args))
+    sys.exit(run_contatos(args) if args.command == "contatos" else run_scan(args))

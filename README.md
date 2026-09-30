@@ -109,7 +109,17 @@ Cada cruzamento novo parte do anterior (ou do relatório, se for o primeiro), en
 
 Leitura por formato: texto e Markdown direto; PDF via `pdftotext`; `.docx` via `pandoc`; planilhas via LibreOffice (convertidas para CSV); imagens lidas visualmente. Conteúdo vindo de imagem sempre aparece marcado como **[interpretação de imagem]**, para conferir com o cliente antes de dar como certo.
 
-### 7. Outros materiais (cotação, resumo, apresentação...)
+### 7. Contatos para importar no Odoo
+
+Com um scan que resolveu o CNPJ, gere o CSV de contatos (matriz e filiais) no formato de importação do `res.partner`:
+
+```bash
+uv run discovery contatos --client cliente-x
+```
+
+Opções: `--run <pasta da execução>` (padrão: a mais recente), `--ajustes <arquivo>` (padrão: o `contatos-ajustes-*.yaml` mais recente), `--reports-dir`, `--out-dir`. Grava `discovery/<cliente>/contatos-<carimbo>.csv`, sempre um arquivo novo, sem acessar a web. Vendedor, Indústria, latitude e longitude saem vazios: o `--cruzar` grava um `contatos-ajustes-<carimbo>.yaml` com os valores que as atas afirmam (cada um com a fonte), e rodar `discovery contatos` de novo gera o CSV atualizado. Execuções anteriores a essa funcionalidade só têm a matriz completa; refaça o `scan` para incluir as filiais.
+
+### 8. Outros materiais (cotação, resumo, apresentação...)
 
 Peça ao Claude o que precisar — por exemplo, "gera uma cotação atualizada com os itens que faltam". Qualquer material assim segue a mesma disciplina dos demais:
 
@@ -135,6 +145,8 @@ discovery/<cliente>/                    # etapas 2 e 3: o que se lê e se compar
   docs-internos/                        # documentos das reuniões (você coloca aqui)
     AAAA-MM-DD-<tipo>-<assunto>.<ext>
   cruzamento-<carimbo>.md               # cruzamento (um por agenda, encadeado)
+  contatos-<carimbo>.csv                # contatos para importar no Odoo (res.partner)
+  contatos-ajustes-<carimbo>.yaml       # valores vindos das atas, aplicados no próximo CSV
   <tipo-descritivo>-<carimbo>.md        # outros materiais (cotação, resumo, ...)
 ```
 

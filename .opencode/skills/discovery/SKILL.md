@@ -73,7 +73,8 @@ Cruza o material das reuniões (atas, transcrições, PDFs, `.docx`, planilhas, 
 
    Arquivo ilegível, corrompido, ferramenta ausente ou formato desconhecido: liste em "não lidos" com o **motivo** e siga com os demais. Documentos grandes: leia por partes e priorize o que responde hipóteses e perguntas; registre o que não foi lido.
 4. **Grave** `discovery/<cliente>/cruzamento-<carimbo>.md` (carimbo do momento: `date +%Y-%m-%d_%H%M%S`), **sempre um arquivo novo**, sem alterar relatório, roteiro, documentos nem dados brutos. No topo, cite a base (relatório ou cruzamento anterior) e a execução de origem do scraping.
-5. **Resuma no chat** o que mudou (hipóteses que subiram ou caíram, contradições, respostas) e o caminho do arquivo.
+5. **Ajustes de contatos.** Se existir ao menos um `discovery/<cliente>/contatos-*.csv`, siga "Ajustes de contatos" abaixo; senão, não grave ajustes e diga que `uv run discovery contatos --client <cliente>` deve rodar antes.
+6. **Resuma no chat** o que mudou (hipóteses que subiram ou caíram, contradições, respostas), o caminho do arquivo e, se gravou, o arquivo de ajustes.
 
 **Seções do documento de cruzamento**
 
@@ -105,6 +106,22 @@ Dentro de 5(b), traduza o escopo de módulos em horas com a régua `referencia/h
 **Totais** por fase e geral em três colunas: horas padrão, horas ajustadas e fora da régua.
 
 **Pauta de negociação:** liste os itens com fator acima de 1.0, com o fator e o motivo, como pontos a debater na agenda.
+
+### Ajustes de contatos
+
+O CSV de contatos (`contatos-*.csv`) é gerado só pelo Python (`uv run discovery contatos`). **Nunca edite o CSV.** Quando os documentos trouxerem valores **explícitos** para um estabelecimento que já está no CSV, grave `discovery/<cliente>/contatos-ajustes-<carimbo>.yaml` (arquivo novo a cada vez) e oriente rodar `uv run discovery contatos --client <cliente>` para gerar o CSV atualizado.
+
+Colunas ajustáveis (chaves): `vendedor`, `industria_principal`, `industrias_secundarias`, `telefone`, `email`, `site`, `latitude`, `longitude`. Nada mais (razão social, CNPJ, CNAE etc. vêm da Receita).
+
+```yaml
+"07.294.692/0001-77":          # CNPJ do estabelecimento, como no CSV
+  vendedor: {valor: "Fernando Colus", fonte: "docs-internos/2026-09-30-ata-kickoff.md: 'o comercial é o Fernando'"}
+```
+
+- Todo valor leva `fonte` (arquivo e trecho ou página); sem fonte o Python ignora o valor.
+- Só valor que o documento **afirma**. O que for sugerido ou inferido **não entra**: liste como pendente de confirmação na seção 6 do cruzamento.
+- Vendedor e Indústria precisam bater com o que existe no Odoo do cliente; se o documento só der o primeiro nome, registre como pendente.
+- Sem valores explícitos, não grave arquivo de ajustes.
 
 **Regras do cruzamento**
 

@@ -18,6 +18,8 @@ discovery/<client>/                     # gitignored; the readable deliverable
   reuniao-<AAAA-MM-DD_HHMMSS>.md        # stage 2 meeting script (~60 questions, hypothesis-validating ones first)
   docs-internos/                        # meeting material dropped by hand: minutes, transcripts, PDF/docx/images, spreadsheets
     AAAA-MM-DD-<tipo>-<assunto>.<ext>   # suggested name (tipo: ata|transcricao|fluxo|planilha|email|proposta); files are immutable
+  contatos-<AAAA-MM-DD_HHMMSS>.csv      # `discovery contatos`: client + branches as res.partner import CSV (Odoo export columns); immutable, new file each run
+  contatos-ajustes-<AAAA-MM-DD_HHMMSS>.yaml  # written by `/discovery --cruzar` from docs-internos (value + source per CNPJ); applied by the next `discovery contatos`
   cruzamento-<AAAA-MM-DD_HHMMSS>.md     # `/discovery <client> --cruzar`: docs-internos crossed with the scraping (new file each time, chained)
   <tipo-descritivo>-<AAAA-MM-DD_HHMMSS>.md  # any other structured material (quote, exec summary, ...); same rules: timestamped, immutable, cites its base
 clients/<id>.yaml                       # per-client config (name, site, cnpj?, queries?, max_pages?)
@@ -25,7 +27,7 @@ referencia/horas.csv                   # versioned hours ruler (tipo,codigo,nome
 tabelasHoras/                           # gitignored; original hours tables (local only), source of referencia/horas.csv
 ```
 
-Code layout in `src/discovery/`: `cli.py` (argparse), `config.py`, `models.py` (`Source`, statuses `ok|falha|nao_coletada|ambigua`), `storage.py`, `collectors/{site,sitemap,tecnologia,signatures,cnpj,filiais,search,news}.py`. Stage 3 (`/discovery <client> --cruzar`, skill only, no Python code) crosses `docs-internos/` with the latest report or previous crossing and writes a new `cruzamento-*.md`; it reads PDF with `pdftotext`, docx with `pandoc`, spreadsheets with `soffice`, and images visually (marked as image interpretation). The crossing also carries an hours table (standard hours from `referencia/horas.csv` × complexity factor 1.0–3.0, provisional scale, factors chained between crossings like hypotheses, items outside the ruler estimated separately as [inferência], no R$); proposals start from the latest crossing's hours table. The skill lives in `.claude/skills/discovery/` and is mirrored in `.opencode/skills/discovery/` (keep both identical).
+Code layout in `src/discovery/`: `cli.py` (argparse: `scan`, `contatos`), `config.py`, `contatos.py` (CSV export, no web), `models.py` (`Source`, statuses `ok|falha|nao_coletada|ambigua`), `storage.py`, `collectors/{site,sitemap,tecnologia,signatures,cnpj,filiais,search,news}.py`. Stage 3 (`/discovery <client> --cruzar`, skill only, no Python code) crosses `docs-internos/` with the latest report or previous crossing and writes a new `cruzamento-*.md`; it reads PDF with `pdftotext`, docx with `pandoc`, spreadsheets with `soffice`, and images visually (marked as image interpretation). The crossing also carries an hours table (standard hours from `referencia/horas.csv` × complexity factor 1.0–3.0, provisional scale, factors chained between crossings like hypotheses, items outside the ruler estimated separately as [inferência], no R$); proposals start from the latest crossing's hours table. The skill lives in `.claude/skills/discovery/` and is mirrored in `.opencode/skills/discovery/` (keep both identical).
 
 Sources (`tipo` in `raw.json`): `site`, `sitemap` (URL count and catalog size estimate), `tecnologia` (platform, marketing, chat, payments and CDN from HTML/headers/cookies/domains; the signature table in `collectors/signatures.py` is small and meant to be extended), `cnpj`, `filiais` (BrasilAPI establishments of the same 8-digit root, only when the CNPJ is resolved), `busca` and `noticias` (only items that cite the client; discarded ones are counted).
 
@@ -34,6 +36,7 @@ Searches are keyless and best-effort: Bing first, then DuckDuckGo (which usually
 ## Commands
 
 - Sync environment: `uv sync`; install the browser once: `uv run playwright install chromium`
+- Contacts CSV: `uv run discovery contatos --client haix [--run <dir>] [--ajustes <yaml>]` (reads `raw.json` only; needs the `cnpj` source ok; filiais need a scan made with `versao_formato` 2)
 - Scan a client: `uv run discovery scan --client haix` (or `--name "X" --site https://x.com.br [--cnpj ...]`); `--dry-run` only resolves the config
 - Tests: `uv run pytest` (site tests use a local HTTP server and real Chromium; CNPJ tests use `httpx.MockTransport`; no network needed)
 - Build: `uv build`

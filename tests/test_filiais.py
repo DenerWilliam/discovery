@@ -92,3 +92,16 @@ def test_unresolved_cnpj_is_not_collected_without_calling_the_api():
         src = collect_filiais(cnpj_source(status=status), client({}, log=log), pause=0)
         assert src.status == NAO_COLETADA and status in src.erro
     assert log == []
+
+
+def test_summary_keeps_full_registration_data():
+    dados = {**branch("BELO HORIZONTE"), "razao_social": "ACME LTDA", "logradouro": "RUA A",
+             "numero": "10", "cep": "30110000", "ddd_telefone_1": "3133334444",
+             "email": "a@acme.com.br", "capital_social": 1000.0,
+             "cnaes_secundarios": [{"codigo": 4321500, "descricao": "Instalação elétrica"}]}
+    existing = {build_cnpj(ROOT, 2): dados}
+    src = collect_filiais(cnpj_source(), client(existing), pause=0)
+    cadastro = src.conteudo["estabelecimentos"][1]["cadastro"]
+    assert cadastro["razao_social"] == "ACME LTDA" and cadastro["cep"] == "30110000"
+    assert cadastro["cnaes_secundarios"][0]["codigo"] == 4321500
+    assert cadastro["complemento"] is None

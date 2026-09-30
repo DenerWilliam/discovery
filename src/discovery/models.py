@@ -6,7 +6,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Any
 
-FORMAT_VERSION = 1
+FORMAT_VERSION = 2
 
 OK = "ok"
 FALHA = "falha"

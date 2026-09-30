@@ -13,6 +13,13 @@ MAX_SUFFIX = 20
 STOP_AFTER_MISSING = 3
 PAUSE_SECONDS = 0.3
 
+# Campos cadastrais da API guardados por estabelecimento (usados na exportação de contatos).
+CADASTRO_FIELDS = (
+    "razao_social", "descricao_tipo_de_logradouro", "logradouro", "numero", "complemento",
+    "bairro", "cep", "ddd_telefone_1", "email", "codigo_natureza_juridica", "natureza_juridica",
+    "capital_social", "opcao_pelo_simples", "opcao_pelo_mei", "cnaes_secundarios",
+)
+
 
 def check_digits(base12: str) -> str:
     """Dois dígitos verificadores de um CNPJ a partir dos 12 primeiros dígitos."""
@@ -41,6 +48,7 @@ def _summarize(cnpj: str, data: dict) -> dict:
         "cnae_descricao": data.get("cnae_fiscal_descricao") or "",
         "situacao": data.get("descricao_situacao_cadastral") or "",
         "inicio_atividade": data.get("data_inicio_atividade") or "",
+        "cadastro": {key: data.get(key) for key in CADASTRO_FIELDS},
     }
 
 

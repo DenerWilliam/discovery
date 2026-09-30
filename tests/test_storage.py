@@ -21,7 +21,7 @@ def test_writes_raw_json_and_md(tmp_path):
     path = write_run(tmp_path / "reports", CLIENT, {"queries": ["a"]}, sources(), T0, T0)
     assert path.name == "2026-09-25_143012-acme"
     raw = json.loads((path / "raw.json").read_text())
-    assert raw["versao_formato"] == 1 and raw["cliente"]["id"] == "acme"
+    assert raw["versao_formato"] == 2 and raw["cliente"]["id"] == "acme"
     assert {s["tipo"] for s in raw["fontes"]} == {"site", "cnpj", "busca"}
     for fonte in raw["fontes"]:
         assert {"origem", "coletado_em", "status", "erro", "conteudo"} <= fonte.keys()
