@@ -16,3 +16,6 @@ wheels/
 # Configuração de clientes reais (nome, site, CNPJ) - só o modelo fica versionado
 /clients/*.yaml
 !/clients/exemplo.yaml
+
+# Régua de horas original (material interno) - só local; a versionada é referencia/horas.csv
+/tabelasHoras/

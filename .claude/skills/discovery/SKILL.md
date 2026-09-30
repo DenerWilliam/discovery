@@ -1,6 +1,6 @@
 ---
 name: discovery
-description: Estrutura os dados brutos de uma varredura web de cliente (reports/<carimbo>-<cliente>/raw.json) em relatório de discovery com escopo de módulos Odoo e gera o roteiro de reunião (~60 perguntas), e com --cruzar cruza os documentos das reuniões (discovery/<cliente>/docs-internos/) com o scraping. Use quando o usuário pedir /discovery, discovery de um cliente, para reestruturar/sintetizar uma coleta já feita, ou para cruzar documentos de reunião. Só coleta na web se o usuário pedir coleta nova.
+description: Estrutura os dados brutos de uma varredura web de cliente (reports/<carimbo>-<cliente>/raw.json) em relatório de discovery com escopo de módulos Odoo e gera o roteiro de reunião (~60 perguntas), e com --cruzar cruza os documentos das reuniões (discovery/<cliente>/docs-internos/) com o scraping e dimensiona o projeto em horas (régua referencia/horas.csv × fator de complexidade). Use quando o usuário pedir /discovery, discovery de um cliente, para reestruturar/sintetizar uma coleta já feita, para cruzar documentos de reunião (com dimensionamento em horas) ou para montar a proposta em horas. Só coleta na web se o usuário pedir coleta nova.
 allowed-tools: Bash(uv run discovery:*), Bash(ls:*), Bash(date:*), Bash(python3:*), Bash(pdftotext:*), Bash(pandoc:*), Bash(soffice:*), Read
 license: MIT
 compatibility: Requer o pacote `discovery` deste repositório (uv).
@@ -81,14 +81,37 @@ Cruza o material das reuniões (atas, transcrições, PDFs, `.docx`, planilhas, 
 2. **Hipóteses atualizadas**: tabela com H#, hipótese, **nível anterior**, **nível novo** (`fato`, `provável` ou `palpite`), **documento e trecho ou página** que sustenta a mudança. Hipóteses novas entram com numeração seguinte (H15, H16, ...).
 3. **Roteiro respondido**: perguntas respondidas pelos documentos (número, resposta resumida, fonte) e a lista das que **continuam em aberto**.
 4. **Contradições**: onde um documento diverge de um dado coletado na web (ou dois documentos divergem entre si), com as **duas fontes**. **Não arbitre**: quem decide é o consultor.
-5. **Impacto no projeto**: (a) **escopo de módulos** (o que entra, sai ou muda de fase, com o motivo); (b) **dimensionamento** com os dados reais (usuários, complexidade, faixa de esforço) e as premissas, saindo do modo condicional quando o dado já existe; (c) **riscos** novos ou alterados.
+5. **Impacto no projeto**: (a) **escopo de módulos** (o que entra, sai ou muda de fase, com o motivo); (b) **dimensionamento** com os dados reais (usuários, complexidade, faixa de esforço) e as premissas, saindo do modo condicional quando o dado já existe, e a **tabela de horas** descrita em "Dimensionamento em horas"; (c) **riscos** novos ou alterados.
 6. **Novas lacunas e perguntas** para a próxima agenda.
+
+### Dimensionamento em horas
+
+Dentro de 5(b), traduza o escopo de módulos em horas com a régua `referencia/horas.csv` (colunas `tipo`, `codigo`, `nome`, `categoria`, `horas_padrao`; tipo = `modulo`, `integracao` ou `atividade`). **Sem valores em R$**: não há preço por hora neste fluxo.
+
+**Régua.** Leia o arquivo com `Read`. Case cada item do escopo pelo `codigo` e, na falta dele, pelo `nome`. Não altere o arquivo. Se o arquivo não existir ou não puder ser lido, informe, trate todos os itens como "fora da régua" e não invente horas padrão. Código duplicado: case pelo nome e avise.
+
+**Tabela** (uma linha por módulo, integração e atividade geral do escopo; atividades como configuração, análise dos processos, migração, treinamento e go-live entram sempre):
+
+| Item | Fase | Horas padrão | Fator anterior | Fator novo | Horas ajustadas | Motivo do fator e fonte |
+|---|---|---:|---:|---:|---:|---|
+
+- **Horas ajustadas** = horas padrão × fator novo.
+- **Escala de fator (provisória, sujeita à negociação):** 1.0, 1.5, 2.0, 2.5, 3.0. Apresente-a assim no documento. Fator fora da escala é aceito se o consultor pedir; registre como **[informado por você]** e marque a linha como "fora da escala".
+- **Fator acima de 1.0 exige motivo e fonte** (arquivo e trecho, ou **[informado por você]**). Sem evidência, o fator é **1.0**.
+- **Encadeamento:** parta dos fatores do cruzamento mais recente (coluna "fator anterior"). Sem cruzamento anterior com tabela de horas, o fator anterior é "—". Um fator só muda por documento (ex.: ata da negociação) ou por informação do usuário marcada como **[informado por você]**, citando a fonte.
+
+**Fora da régua:** itens do escopo sem linha na régua (ex.: custos de importação, intercompany) vão em bloco à parte, com horas marcadas **[inferência]**, a base da estimativa e subtotal separado.
+
+**Totais** por fase e geral em três colunas: horas padrão, horas ajustadas e fora da régua.
+
+**Pauta de negociação:** liste os itens com fator acima de 1.0, com o fator e o motivo, como pontos a debater na agenda.
 
 **Regras do cruzamento**
 
 - Toda afirmação cita **arquivo e trecho ou página**. O que o usuário disser na conversa entra como **[informado por você]**.
 - Conteúdo lido de imagem é sempre **[interpretação de imagem]**.
-- Não mude o nível de uma hipótese sem um documento que a sustente.
+- Não mude o nível de uma hipótese sem um documento que a sustente. O mesmo vale para o fator de complexidade das horas.
+- Problemas na régua (código duplicado, arquivo ausente) são reportados no documento, sem alterar `referencia/horas.csv`.
 - Documentos e cruzamentos anteriores nunca são sobrescritos; cada cruzamento é um arquivo novo.
 
 ## Outros materiais estruturados
@@ -98,6 +121,8 @@ Além do relatório, do roteiro e do cruzamento, você pode ser pedido para estr
 - **Nome:** `discovery/<cliente>/<tipo-descritivo>-<AAAA-MM-DD_HHMMSS>.md` (carimbo do momento: `date +%Y-%m-%d_%H%M%S`). O `<tipo-descritivo>` é livre e em kebab-case (ex.: `cotacao-complementar`, `resumo-executivo`).
 - **Imutável:** uma versão nova é sempre um **arquivo novo**; nunca sobrescreva um material já gravado.
 - **Cita a base:** no topo, diga de qual documento você partiu (relatório, cruzamento ou outro material anterior).
+
+**Proposta ou cotação (horas):** parta da **tabela de horas do cruzamento mais recente** e replique horas padrão, fator e horas ajustadas **sem recalcular**, citando esse cruzamento como base. Sem cruzamento com tabela de horas, informe a falta, ofereça rodar `--cruzar` antes e **não grave** a proposta. Não inclua valores em R$.
 
 Assim, o conjunto de arquivos em `discovery/<cliente>/`, ordenado pelo nome, mostra a evolução do cliente ao longo do tempo.
 

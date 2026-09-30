@@ -1,0 +1,70 @@
+tipo,codigo,nome,categoria,horas_padrao
+modulo,sale_rental,Aluguel de Equipamentos,,16
+modulo,hr_timesheet,Apontamento de Horas,,4
+modulo,sign_oca,Assinatura de Documentos,,4
+modulo,audit_log,Auditoria (Log),,6
+modulo,automation,Automação,,16
+modulo,crm,CRM,,8
+modulo,commission_oca,Comissões,,8
+modulo,purchase,Compras,,16
+modulo,contract,Contratos Recorrentes,,16
+modulo,agreement,Contratos e Acordos,,16
+modulo,hr_expense,Despesas de Viagem,,8
+modulo,mass_mailing,E-Mail Marketing,,8
+modulo,website_slides,E-learning,,24
+modulo,stock,Estoque,,24
+modulo,account,Financeiro / Contabilidade,,120
+modulo,payroll_oca,Folha de Pagamento,,24
+modulo,fleet,Frota,,8
+modulo,hr,Funcionários (Recursos Humanos),,8
+modulo,hr_holidays,Férias e Ausências,,8
+modulo,ged,GED - Gestão de Documentos,,16
+modulo,mgmtsystem,Gestão da Qualidade,,16
+modulo,account_asset_management,Gestão de Ativos,,8
+modulo,document_knowledge,Gestão de Conhecimento,,8
+modulo,hr_epi_epc,Gestão de EPI/EPC,,16
+modulo,event,Gestão de Eventos,,16
+modulo,helpdesk_mgmt,Helpdesk,,16
+modulo,im_livechat,Livechat,,16
+modulo,mrp,Manufatura,,24
+modulo,maintenance,Manutenção,,8
+modulo,bi_sql_editor,Motor para Relatórios Personalizados SQL,,6
+modulo,mis_builder_budget,Orçamento Empresarial,,16
+modulo,paineis,Painéis de KPI,,16
+modulo,point_of_sale,Ponto de Venda,,24
+modulo,hr_attendance,Presença,,8
+modulo,project,Projetos,,16
+modulo,rma,RMA,,16
+modulo,crm_claim,Reclamações (CRM),,16
+modulo,repair,Reparo,,16
+modulo,req_est,Requisição de Estoque,,14
+modulo,fieldservice,Serviço de Campo,,16
+modulo,tms,TMS,,24
+modulo,tier_validation,Tier Validation,,16
+modulo,sale,Vendas,,16
+modulo,vertical_rental,Vendas de Locação,,40
+modulo,website,Website,,24
+modulo,website_sale,eCommerce,,24
+integracao,cnab_payable,CNAB Pagamentos,,20
+integracao,cnab_receivable,CNAB Recebimentos,,20
+integracao,cte,CT-e,,20
+integracao,ai_oca_bridge_chatter,Chatbot de Inteligência Artificial,,16
+integracao,connector_jira,Connector Jira,,16
+integracao,ai_oca_bridge,Inteligência Artificial,,24
+integracao,mdfe,MDF-e,,20
+integracao,nfe,NF-e,,20
+integracao,nfce,NFC-e,,20
+integracao,nfse,NFS-e,,20
+integracao,sped,SPED,,40
+integracao,mail_gateway_telegram,Telegram,,8
+integracao,mail_gateway_whatsapp,Whatsapp,,8
+atividade,system_config,Preparo do Ambiente e Configuração Inicial do Sistema,Configuração,16
+atividade,discovery_analysis,Alinhamento e Análise dos Processos,Descoberta,40
+atividade,custom_dev,Desenvolvimento Customizado,Desenvolvimento,40
+atividade,custom_report,Relatório Customizado,Desenvolvimento,8
+atividade,data_migration_partners,Importação de Dados - Clientes e Fornecedores,Migração,16
+atividade,data_migration_products,Importação de Dados - Produtos e Serviços,Migração,16
+atividade,data_migration_bom,Importação de Dados - Lista de Materiais (BoM),Migração,16
+atividade,data_migration_account_move,Importação de Dados - Lançamentos Contábeis,Migração,24
+atividade,user_training,Treinamento de Usuários,Treinamento,40
+atividade,go_live_support,Suporte de Go-Live,Suporte,40

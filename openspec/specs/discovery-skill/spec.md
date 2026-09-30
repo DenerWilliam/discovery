@@ -180,7 +180,7 @@ A skill SHALL ler documentos em texto (`.md`, `.txt`), PDF, `.docx`, planilhas e
 - **THEN** ele é listado na seção de arquivos não lidos, com o motivo, e o cruzamento continua com os demais
 
 ### Requirement: Conteúdo do documento de cruzamento
-O cruzamento SHALL conter: a lista de documentos considerados e não lidos; as hipóteses atualizadas, com o nível anterior, o nível novo (fato, provável ou palpite) e o documento que sustenta a mudança; as perguntas do roteiro respondidas pelos documentos e as que continuam em aberto; as contradições entre o scraping e os documentos; o impacto no escopo de módulos, no dimensionamento e nos riscos; e as novas lacunas e perguntas.
+O cruzamento SHALL conter: a lista de documentos considerados e não lidos; as hipóteses atualizadas, com o nível anterior, o nível novo (fato, provável ou palpite) e o documento que sustenta a mudança; as perguntas do roteiro respondidas pelos documentos e as que continuam em aberto; as contradições entre o scraping e os documentos; o impacto no escopo de módulos, no dimensionamento e nos riscos, sendo que o dimensionamento SHALL incluir a tabela de horas da capability `dimensionamento-horas`; e as novas lacunas e perguntas.
 
 #### Scenario: Hipótese confirmada ou corrigida
 - **WHEN** um documento confirma, contradiz ou esclarece uma hipótese
@@ -197,6 +197,10 @@ O cruzamento SHALL conter: a lista de documentos considerados e não lidos; as h
 #### Scenario: Impacto no projeto
 - **WHEN** os documentos trazem dados que alteram o escopo, o dimensionamento ou os riscos (por exemplo o número real de usuários)
 - **THEN** o cruzamento indica o que muda e a nova estimativa, com as premissas
+
+#### Scenario: Tabela de horas no cruzamento
+- **WHEN** a skill grava um cruzamento
+- **THEN** a seção de dimensionamento traz a tabela de horas padrão, fator e horas ajustadas, os itens fora da régua, os totais e a pauta de negociação
 
 ### Requirement: Rastreabilidade e interpretação de imagens
 Toda afirmação do cruzamento SHALL citar o arquivo de origem e o trecho ou a página, e o conteúdo obtido de imagens SHALL ser marcado como interpretação de imagem a ser conferida.
@@ -223,3 +227,14 @@ Todo material que a skill estruturar para um cliente, além do relatório, do ro
 #### Scenario: Evolução visível no histórico
 - **WHEN** vários materiais de um cliente existem em `discovery/<cliente>/`
 - **THEN** os nomes dos arquivos, ordenados, mostram a ordem cronológica em que foram produzidos
+
+### Requirement: Proposta parte da tabela de horas do cruzamento
+Quando o usuário pedir um material de proposta ou cotação, a skill SHALL partir da tabela de horas do cruzamento mais recente, sem recalcular horas nem fatores, e SHALL citar esse cruzamento como base. Sem cruzamento com tabela de horas, a skill SHALL informar e oferecer executar `--cruzar` antes. O material não SHALL conter valores em R$ enquanto a taxa horária não fizer parte do fluxo.
+
+#### Scenario: Proposta com cruzamento disponível
+- **WHEN** existe um cruzamento com tabela de horas e o usuário pede a proposta
+- **THEN** o material replica horas padrão, fator e horas ajustadas desse cruzamento e cita-o no topo
+
+#### Scenario: Proposta sem tabela de horas
+- **WHEN** não existe cruzamento com tabela de horas
+- **THEN** a skill informa a falta, oferece rodar `--cruzar` e não grava a proposta
