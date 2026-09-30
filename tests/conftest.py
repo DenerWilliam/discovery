@@ -19,7 +19,10 @@ def _make_handler(routes):
                 self.end_headers()
                 return
             headers = {}
-            if isinstance(route, tuple) and route[0] == "page":  # ("page", corpo, {cabeçalhos})
+            if isinstance(route, tuple) and route[0] == "download":  # ("download", corpo)
+                route, headers = route[1], {"Content-Type": "application/octet-stream",
+                                            "Content-Disposition": 'attachment; filename="relatorio.pdf"'}
+            elif isinstance(route, tuple) and route[0] == "page":  # ("page", corpo, {cabeçalhos})
                 _, route, headers = route
             body = route.encode()
             self.send_response(200)

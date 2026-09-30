@@ -10,6 +10,8 @@ from playwright.sync_api import BrowserContext, Error as PlaywrightError
 from discovery.models import FALHA, NAO_COLETADA, OK, Source, now_iso
 
 PAGE_TIMEOUT_MS = 20_000
+MAX_DOWNLOADS = 50  # teto de arquivos para download registrados por execução
+MOTIVO_DOWNLOAD = "arquivo para download"
 
 PRIORITY_KEYWORDS = (
     "sobre", "quem-somos", "quem somos", "institucional", "empresa",
@@ -56,6 +58,10 @@ def _is_login_redirect(requested: str, final: str) -> bool:
     return False
 
 
+def _is_download_error(exc: PlaywrightError) -> bool:
+    return "Download is starting" in str(exc)
+
+
 def collect_site(context: BrowserContext, site: str, max_pages: int) -> list[Source]:
     """Visita a home e as páginas internas mais relevantes; devolve uma fonte por página."""
     domain = _host(site)
@@ -63,17 +69,21 @@ def collect_site(context: BrowserContext, site: str, max_pages: int) -> list[Sou
     sources: list[Source] = []
     visited: set[str] = set()
     frontier: dict[str, int] = {start: 100}
+    attempts = 0  # só páginas HTML contam para max_pages; downloads não
+    downloads = 0
     page = context.new_page()
     page.set_default_timeout(PAGE_TIMEOUT_MS)
+    page.on("download", lambda download: download.cancel())
 
     try:
-        while frontier and len(visited) < max_pages:
+        while frontier and attempts < max_pages:
             url = max(frontier, key=lambda u: (frontier[u], -len(u)))
             frontier.pop(url)
             if url in visited:
                 continue
             visited.add(url)
             is_home = url == start
+            attempts += 1
 
             try:
                 response = page.goto(url, wait_until="load")
@@ -98,6 +108,14 @@ def collect_site(context: BrowserContext, site: str, max_pages: int) -> list[Sou
                 text = _clean_text(page.inner_text("body"))
                 links = page.evaluate(_EXTRACT_LINKS)
             except PlaywrightError as exc:
+                if _is_download_error(exc):
+                    attempts -= 1
+                    if downloads < MAX_DOWNLOADS:
+                        downloads += 1
+                        sources.append(Source("site", url, NAO_COLETADA, erro=MOTIVO_DOWNLOAD))
+                    if is_home:
+                        break
+                    continue
                 sources.append(Source("site", url, FALHA, erro=str(exc).splitlines()[0]))
                 if is_home:
                     break

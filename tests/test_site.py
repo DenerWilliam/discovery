@@ -61,3 +61,29 @@ def test_login_redirect_is_discarded(browser_context, serve):
     assert restrito.status == NAO_COLETADA
     assert restrito.conteudo is None
     assert "login" in restrito.erro
+
+
+def routes_with_downloads(n=4):
+    r = routes()
+    links = "".join(f'<a href="/api/rel{i}/report">r{i}</a>' for i in range(n))
+    r["/"] = HOME.replace("</body>", links + "</body>")
+    for i in range(n):
+        r[f"/api/rel{i}/report"] = ("download", "conteudo binario")
+    return r
+
+
+def test_download_is_recorded_as_not_collected(browser_context, serve):
+    base = serve(routes_with_downloads())
+    sources = collect_site(browser_context, base + "/", max_pages=10)
+    downloads = [s for s in sources if "/api/" in s.origem]
+    assert len(downloads) == 4
+    assert all(s.status == NAO_COLETADA and s.conteudo is None for s in downloads)
+    assert all(s.erro == "arquivo para download" for s in downloads)
+    assert not any(s.status == FALHA for s in sources)
+
+
+def test_downloads_do_not_consume_page_limit(browser_context, serve):
+    base = serve(routes_with_downloads(n=8))
+    sources = collect_site(browser_context, base + "/", max_pages=4)
+    html = [s for s in sources if s.status == OK]
+    assert len(html) == 4  # home + 3 páginas relevantes, apesar dos 8 downloads
