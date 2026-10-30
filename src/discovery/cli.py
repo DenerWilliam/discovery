@@ -17,6 +17,7 @@ from discovery.collectors.site import collect_site
 from discovery.collectors.sitemap import collect_sitemap
 from discovery.collectors.tecnologia import collect_tecnologia
 from discovery.config import ConfigError, load_config
+from discovery.consolidar import consolidar_modulos
 from discovery.contatos import ContatosError, export, find_latest_ajustes, find_latest_run
 from discovery.models import OK
 from discovery.storage import write_run
@@ -40,6 +41,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--cnpj", help="CNPJ do cliente (evita a busca no site)")
     scan.add_argument("--query", action="append", help="query de busca (repetível; {name} = nome)")
     scan.add_argument("--max-pages", type=int, help="máximo de páginas do site")
+    scan.add_argument("--locale", help="idioma da coleta (padrão pt-BR; ex.: en-US)")
     scan.add_argument("--clients-dir", type=Path, default=Path("clients"))
     scan.add_argument("--reports-dir", type=Path, default=Path("reports"))
     scan.add_argument("--dry-run", action="store_true", help="só resolve a configuração e sai")
@@ -52,7 +54,40 @@ def build_parser() -> argparse.ArgumentParser:
     contatos.add_argument("--reports-dir", type=Path, default=Path("reports"))
     contatos.add_argument("--out-dir", type=Path, default=Path("discovery"),
                           help="pasta base dos materiais (saída em <out-dir>/<cliente>/)")
+    consolidar = sub.add_parser(
+        "consolidar-modulos", help="Consolida módulos Odoo propostos de todos os discoveries em um CSV.")
+    consolidar.add_argument("--client", help="consolidar apenas um cliente")
+    consolidar.add_argument("--output", "-o", help="arquivo de saída (padrão: descoberta-modulos-consolidado-<timestamp>.csv)")
+    consolidar.add_argument("--discovery-dir", type=Path, default=Path("discovery"),
+                           help="pasta base dos discoveries")
+    consolidar.add_argument("--referencia", type=Path, default=Path("referencia/horas.csv"),
+                           help="arquivo de referência de horas")
     return parser
+
+
+def run_consolidar_modulos(args: argparse.Namespace) -> int:
+    try:
+        output_file, count = consolidar_modulos(
+            args.discovery_dir, args.referencia,
+            client_filter=args.client, output_file=args.output
+        )
+
+        # Exibir estatísticas
+        all_data = []
+        with open(output_file) as f:
+            import csv
+            all_data = list(csv.DictReader(f))
+
+        clientes = set(m['cliente'] for m in all_data)
+        enterprise = len([m for m in all_data if m['enterprise'] == 'Sim'])
+
+        print(f"{output_file} ({count} módulos; {len(clientes)} clientes)")
+        print(f"  Enterprise: {enterprise}, Community: {count - enterprise}")
+
+        return 0
+    except (ValueError, OSError) as exc:
+        print(f"Erro: {exc}", file=sys.stderr)
+        return 1
 
 
 def run_contatos(args: argparse.Namespace) -> int:
@@ -75,7 +110,8 @@ def run_scan(args: argparse.Namespace) -> int:
     try:
         config = load_config(
             client=args.client, name=args.name, site=args.site, cnpj=args.cnpj,
-            queries=args.query, max_pages=args.max_pages, clients_dir=args.clients_dir,
+            queries=args.query, max_pages=args.max_pages, locale=args.locale,
+            clients_dir=args.clients_dir,
         )
     except ConfigError as exc:
         print(f"Erro: {exc}", file=sys.stderr)
@@ -83,7 +119,7 @@ def run_scan(args: argparse.Namespace) -> int:
 
     if args.dry_run:
         print(f"cliente={config.id} nome={config.name!r} site={config.site} "
-              f"cnpj={config.cnpj} max_pages={config.max_pages}")
+              f"cnpj={config.cnpj} max_pages={config.max_pages} locale={config.locale}")
         for query in config.queries:
             print(f"query: {query}")
         return 0
@@ -91,10 +127,17 @@ def run_scan(args: argparse.Namespace) -> int:
     started = datetime.now()
     with sync_playwright() as playwright:
         browser = playwright.chromium.launch()
-        context = browser.new_context(locale="pt-BR", user_agent=USER_AGENT)
+        context = browser.new_context(locale=config.locale, user_agent=USER_AGENT)
         try:
             print(f"Varrendo site {config.site} ...", file=sys.stderr)
             sources = collect_site(context, config.site, config.max_pages)
+            arquivadas = [s for s in sources if (s.conteudo or {}).get("origem") == "arquivo"]
+            if arquivadas:
+                capturas = sorted({s.conteudo["captura"] for s in arquivadas})
+                periodo = (f"capturas de {capturas[0]} a {capturas[-1]}" if len(capturas) > 1
+                           else f"captura de {capturas[0]}")
+                print(f"Aviso: site recusou o acesso; usando o arquivo público "
+                      f"({len(arquivadas)} páginas; {periodo}).", file=sys.stderr)
             print("Lendo sitemap ...", file=sys.stderr)
             sources.append(collect_sitemap(config.site))
             print("Detectando tecnologias ...", file=sys.stderr)
@@ -105,23 +148,35 @@ def run_scan(args: argparse.Namespace) -> int:
             print("Consultando filiais ...", file=sys.stderr)
             sources.append(collect_filiais(cnpj_source))
             print(f"Executando {len(config.queries)} buscas ...", file=sys.stderr)
-            sources += collect_searches(context, config.queries, keyword=config.name.split()[0])
+            sources += collect_searches(context, config.queries,
+                                        keyword=config.name.split()[0], locale=config.locale)
             print("Buscando notícias ...", file=sys.stderr)
-            sources.append(collect_news(config.name))
+            sources.append(collect_news(config.name, locale=config.locale))
         finally:
             browser.close()
 
     path = write_run(
         args.reports_dir,
         {"id": config.id, "name": config.name, "site": config.site},
-        {"cnpj": config.cnpj, "queries": config.queries, "max_pages": config.max_pages},
+        {"cnpj": config.cnpj, "queries": config.queries, "max_pages": config.max_pages,
+         "locale": config.locale},
         sources, started, datetime.now(),
     )
     ok = sum(s.status == OK for s in sources)
     print(f"{path} ({ok}/{len(sources)} fontes ok)")
+    for source in sources:
+        if source.status == OK:
+            continue
+        detalhe = f" [{source.motivo}]" if source.motivo else ""
+        print(f"  {source.tipo} {source.origem}: {source.erro}{detalhe}", file=sys.stderr)
     return 0
 
 
 def main(argv: list[str] | None = None) -> None:
     args = build_parser().parse_args(argv)
-    sys.exit(run_contatos(args) if args.command == "contatos" else run_scan(args))
+    if args.command == "contatos":
+        sys.exit(run_contatos(args))
+    elif args.command == "consolidar-modulos":
+        sys.exit(run_consolidar_modulos(args))
+    else:
+        sys.exit(run_scan(args))
