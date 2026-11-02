@@ -42,3 +42,20 @@ def test_missing_site_is_error(tmp_path):
 def test_missing_client_file_is_error(tmp_path):
     with pytest.raises(ConfigError, match="não encontrado"):
         load_config(client="nada", clients_dir=tmp_path)
+
+
+def test_locale_defaults_and_override(clients_dir):
+    assert load_config(client="acme", clients_dir=clients_dir).locale == "pt-BR"
+    assert load_config(client="acme", clients_dir=clients_dir, locale="en-US").locale == "en-US"
+
+
+def test_locale_from_file(tmp_path):
+    (tmp_path / "acme.yaml").write_text(
+        "name: Acme\nsite: https://acme.com.br\nlocale: es-ES\n", encoding="utf-8")
+    assert load_config(client="acme", clients_dir=tmp_path).locale == "es-ES"
+
+
+@pytest.mark.parametrize("locale", ["pt", "pt-br", "pt_BR", "xx-YYY"])
+def test_invalid_locale_is_error(tmp_path, locale):
+    with pytest.raises(ConfigError, match="Idioma"):
+        load_config(name="Cliente X", site="https://x.com.br", locale=locale, clients_dir=tmp_path)

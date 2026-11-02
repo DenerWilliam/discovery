@@ -10,6 +10,8 @@ from pathlib import Path
 import yaml
 
 DEFAULT_MAX_PAGES = 15
+DEFAULT_LOCALE = "pt-BR"
+LOCALE_PATTERN = re.compile(r"^[a-z]{2}-[A-Z]{2}$")
 
 # Bing/DuckDuckGo automatizados degradam com termos extras (retornam resultados
 # aleatórios); o padrão é só o nome entre aspas. Queries extras: clients/<id>.yaml.
@@ -28,6 +30,7 @@ class ClientConfig:
     cnpj: str | None = None
     queries: list[str] = field(default_factory=list)
     max_pages: int = DEFAULT_MAX_PAGES
+    locale: str = DEFAULT_LOCALE
 
 
 def slugify(value: str) -> str:
@@ -43,6 +46,7 @@ def load_config(
     cnpj: str | None = None,
     queries: list[str] | None = None,
     max_pages: int | None = None,
+    locale: str | None = None,
     clients_dir: Path = Path("clients"),
 ) -> ClientConfig:
     data: dict = {}
@@ -64,6 +68,12 @@ def load_config(
     final_queries = queries or data.get("queries") or DEFAULT_QUERIES
     final_queries = [q.replace("{name}", final_name) for q in final_queries]
 
+    final_locale = str(locale or data.get("locale") or DEFAULT_LOCALE)
+    if not LOCALE_PATTERN.match(final_locale):
+        raise ConfigError(
+            f"Idioma inválido: {final_locale!r} (use o formato ll-CC, por exemplo pt-BR ou en-US)."
+        )
+
     raw_cnpj = cnpj or data.get("cnpj")
     return ClientConfig(
         id=client or slugify(final_name),
@@ -72,4 +82,5 @@ def load_config(
         cnpj=str(raw_cnpj) if raw_cnpj else None,
         queries=final_queries,
         max_pages=int(max_pages or data.get("max_pages") or DEFAULT_MAX_PAGES),
+        locale=final_locale,
     )

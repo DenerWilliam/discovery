@@ -8,7 +8,8 @@ from urllib.parse import urlparse
 
 import httpx
 
-from discovery.models import FALHA, NAO_COLETADA, OK, Source
+from discovery.collectors.resiliencia import buscar, motivo_de_excecao, motivo_de_status
+from discovery.models import FALHA, NAO_COLETADA, OK, RECUSADO, Source
 
 MAX_SITEMAPS = 20
 MAX_URLS = 50_000
@@ -57,25 +58,28 @@ def collect_sitemap(site: str, client: httpx.Client | None = None) -> Source:
             client.close()
 
 
-def _get(client: httpx.Client, url: str) -> httpx.Response | None:
-    try:
-        return client.get(url)
-    except httpx.HTTPError:
-        return None
+def _get(client: httpx.Client, url: str) -> tuple[httpx.Response | None, BaseException | None]:
+    return buscar(client, url)
 
 
 def _collect(base: str, client: httpx.Client) -> Source:
-    robots = _get(client, base + "/robots.txt")
+    robots, _ = _get(client, base + "/robots.txt")
     queue = _sitemaps_from_robots(robots.text) if robots is not None and robots.status_code == 200 else []
     queue = queue or [base + "/sitemap.xml"]
 
     urls: list[str] = []
     fetched: list[str] = []
     found_any = False
+    bloqueios: list[int] = []
+    motivos: set[str] = set()
     while queue and len(fetched) < MAX_SITEMAPS and len(urls) < MAX_URLS:
         current = queue.pop(0)
-        response = _get(client, current)
+        response, falha = _get(client, current)
         if response is None or response.status_code != 200:
+            if response is not None and motivo_de_status(response.status_code) == RECUSADO:
+                bloqueios.append(response.status_code)
+            elif response is None and falha is not None:
+                motivos.add(motivo_de_excecao(falha))
             continue
         try:
             root = ET.fromstring(response.content)
@@ -89,6 +93,12 @@ def _collect(base: str, client: httpx.Client) -> Source:
             urls += _locs(root, "url")
 
     if not found_any:
+        if bloqueios:
+            return Source("sitemap", base, NAO_COLETADA,
+                          erro=f"acesso recusado (HTTP {bloqueios[0]})", motivo=RECUSADO)
+        if motivos:
+            return Source("sitemap", base, NAO_COLETADA,
+                          erro="sitemap inacessível", motivo=sorted(motivos)[0])
         return Source("sitemap", base, NAO_COLETADA,
                       erro="Nenhum sitemap encontrado em robots.txt nem em /sitemap.xml.")
     urls = urls[:MAX_URLS]

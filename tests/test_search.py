@@ -5,7 +5,7 @@ from playwright.sync_api import Error as PlaywrightError
 from discovery.collectors.search import (
     ENGINES, _decode_bing_url, parse_bing, parse_ddg, search_query,
 )
-from discovery.models import NAO_COLETADA, OK
+from discovery.models import NAO_COLETADA, OK, RECUSADO
 
 FIX = Path(__file__).parent / "fixtures"
 read = lambda name: (FIX / name).read_text()
@@ -79,7 +79,8 @@ def test_all_engines_blocked_is_not_collected():
     src = search_query("Acme", fetch)
     assert src.status == NAO_COLETADA
     assert "bing" in src.erro and "duckduckgo" in src.erro
-    assert src.conteudo == {"query": "Acme"}
+    assert src.conteudo == {"query": "Acme", "locale": "pt-BR"}
+    assert src.motivo == RECUSADO
 
 
 def test_engine_without_block_and_no_results_is_ok_but_empty():
@@ -122,3 +123,10 @@ def test_bing_is_retried_once_before_falling_back():
 
     src = search_query("Acme", fetch, keyword="acme")
     assert src.conteudo["motor"] == "bing" and calls["n"] == 2
+
+
+def test_locale_goes_to_the_engine():
+    fetch = fake_fetch({"bing.com": (200, read("bing_results.html"))})
+    src = search_query("Acme", fetch, locale="en-US")
+    assert src.conteudo["locale"] == "en-US"
+    assert "setlang=en-US" in fetch.calls[0]

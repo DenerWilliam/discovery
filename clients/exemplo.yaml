@@ -20,3 +20,7 @@ site: https://www.exemplo.com.br/   # obrigatório: site oficial do cliente
 
 # max_pages: 15
 # Opcional. Teto de páginas do site visitadas na varredura (padrão: 15).
+
+# locale: pt-BR
+# Opcional. Idioma da coleta no formato ll-CC (padrão: pt-BR; ex.: en-US).
+# Vale para o navegador, o Bing e o Google News. Também aceita --locale no CLI.

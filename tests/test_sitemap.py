@@ -1,7 +1,7 @@
 import httpx
 
 from discovery.collectors.sitemap import collect_sitemap
-from discovery.models import FALHA, NAO_COLETADA, OK
+from discovery.models import FALHA, NAO_COLETADA, OK, RECUSADO
 
 NS = 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"'
 
@@ -69,3 +69,24 @@ def test_network_error_is_not_collected():
 
     src = collect_sitemap(B, httpx.Client(transport=httpx.MockTransport(boom)))
     assert src.status == NAO_COLETADA
+
+
+def test_transient_error_is_retried():
+    respostas = iter([503, 200])
+
+    def handler(request):
+        if request.url.path != "/sitemap.xml":
+            return httpx.Response(404)
+        status = next(respostas)
+        if status != 200:
+            return httpx.Response(status)
+        return httpx.Response(200, text=urlset(f"{B}/a/p"))
+
+    src = collect_sitemap(B, httpx.Client(transport=httpx.MockTransport(handler)))
+    assert src.status == OK and src.conteudo["total_urls"] == 1
+
+
+def test_blocked_sitemap_is_not_collected_with_motivo():
+    src = collect_sitemap(B, httpx.Client(
+        transport=httpx.MockTransport(lambda request: httpx.Response(403))))
+    assert src.status == NAO_COLETADA and src.motivo == RECUSADO

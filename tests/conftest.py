@@ -4,11 +4,26 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import pytest
 from playwright.sync_api import sync_playwright
 
+from discovery.collectors import arquivo, resiliencia
+
+
+@pytest.fixture(autouse=True)
+def sem_espera(monkeypatch):
+    """Tira as pausas entre tentativas: os testes não esperam de verdade."""
+    monkeypatch.setattr(resiliencia, "ESPERAS", (0.0, 0.0))
+    monkeypatch.setattr(arquivo, "ESPERAS", (0.0, 0.0))
+
 
 def _make_handler(routes):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             route = routes.get(self.path.split("?")[0])
+            if callable(route):
+                route = route()
+            if isinstance(route, tuple) and route[0] == "status":
+                self.send_response(route[1])
+                self.end_headers()
+                return
             if route is None:
                 self.send_response(404)
                 self.end_headers()

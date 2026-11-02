@@ -73,3 +73,30 @@ def test_all_irrelevant_is_empty_with_count_and_no_junk_stored():
     src = collect_news("Haix Rental", client(lambda r: httpx.Response(200, text=MIXED)))
     assert src.status == OK and src.conteudo["itens"] == []
     assert src.conteudo["descartados"] == 3
+
+
+def test_locale_changes_the_feed_language():
+    seen = []
+
+    def handler(request):
+        seen.append(str(request.url))
+        return httpx.Response(200, text=XML)
+
+    src = collect_news("Acme", client(handler), locale="en-US")
+    assert src.conteudo["locale"] == "en-US"
+    assert "hl=en-US" in seen[0] and "gl=US" in seen[0] and "ceid=US:en" in seen[0]
+
+
+def test_transient_error_is_retried():
+    respostas = iter([503, 200])
+
+    def handler(request):
+        return httpx.Response(next(respostas), text=XML)
+
+    src = collect_news("Acme", client(handler))
+    assert src.status == OK and len(src.conteudo["itens"]) == 2
+
+
+def test_http_error_keeps_motivo():
+    src = collect_news("Acme", client(lambda r: httpx.Response(403)))
+    assert src.status == FALHA and src.motivo == "recusado"

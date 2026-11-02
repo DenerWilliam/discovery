@@ -1,5 +1,6 @@
+from discovery.collectors import site as site_module
 from discovery.collectors.site import collect_site
-from discovery.models import FALHA, NAO_COLETADA, OK
+from discovery.models import FALHA, NAO_COLETADA, OK, RECUSADO, SEM_RESPOSTA
 
 HOME = """<title>Home</title><body><h1>Bem-vindo</h1>
 <a href="/sobre">Sobre nós</a> <a href="/contato">Contato</a>
@@ -52,6 +53,7 @@ def test_unreachable_site_is_recorded_as_failure(browser_context):
     sources = collect_site(browser_context, "http://127.0.0.1:1/", max_pages=3)
     assert len(sources) == 1
     assert sources[0].status == FALHA and sources[0].erro
+    assert sources[0].motivo == SEM_RESPOSTA
 
 
 def test_login_redirect_is_discarded(browser_context, serve):
@@ -87,3 +89,47 @@ def test_downloads_do_not_consume_page_limit(browser_context, serve):
     sources = collect_site(browser_context, base + "/", max_pages=4)
     html = [s for s in sources if s.status == OK]
     assert len(html) == 4  # home + 3 páginas relevantes, apesar dos 8 downloads
+
+
+def test_retries_transient_status_on_home(browser_context, serve):
+    respostas = iter([("status", 429), ("status", 429), "<title>Home</title><body>Oi</body></html>"])
+    base = serve({"/": lambda: next(respostas)})
+    sources = collect_site(browser_context, base + "/", max_pages=1)
+    assert sources[0].status == OK and sources[0].conteudo["titulo"] == "Home"
+
+
+def test_blocked_home_is_failure_with_motivo_and_tries_archive(browser_context, serve, monkeypatch):
+    chamadas = []
+
+    def arquivo_vazio(dominio, max_pages, **kwargs):
+        chamadas.append((dominio, max_pages))
+        return []
+
+    monkeypatch.setattr(site_module.arquivo, "coletar", arquivo_vazio)
+    base = serve({"/": ("status", 403)})
+    sources = collect_site(browser_context, base + "/", max_pages=3)
+    assert len(sources) == 1
+    assert sources[0].status == FALHA and sources[0].motivo == RECUSADO
+    assert chamadas == [("127.0.0.1", 3)]
+
+
+def test_server_error_home_does_not_try_archive(browser_context, serve, monkeypatch):
+    chamadas = []
+    monkeypatch.setattr(site_module.arquivo, "coletar",
+                        lambda *a, **k: chamadas.append(1) or [])
+    base = serve({"/": ("status", 500)})
+    sources = collect_site(browser_context, base + "/", max_pages=3)
+    assert sources[0].status == FALHA and sources[0].motivo == "falhou"
+    assert chamadas == []
+
+
+def test_archive_content_is_used_when_home_is_blocked(browser_context, serve, monkeypatch):
+    from discovery.models import Source
+
+    monkeypatch.setattr(site_module.arquivo, "coletar", lambda *a, **k: [
+        Source("site", "https://arquivo.example/", OK, conteudo={
+            "titulo": "Home arquivada", "texto": "texto", "origem": "arquivo",
+            "captura": "20260101000000", "url_snapshot": "https://web.archive.org/x"})])
+    base = serve({"/": ("status", 429)})
+    sources = collect_site(browser_context, base + "/", max_pages=3)
+    assert sources[0].conteudo["origem"] == "arquivo"

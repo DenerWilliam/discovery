@@ -29,7 +29,11 @@ def _render_source_md(source: Source) -> str:
     ]
     if source.erro:
         lines.append(f"- erro: {source.erro}")
+    if source.motivo:
+        lines.append(f"- motivo: {source.motivo}")
     content = source.conteudo
+    if isinstance(content, dict) and content.get("origem") == "arquivo":
+        lines.append(f"- origem do conteúdo: arquivo público (captura de {content.get('captura')})")
     if source.tipo == "site" and source.status == OK and content:
         lines += ["", f"**{content['titulo']}**", "", content["texto"]]
     elif source.tipo == "busca" and content:

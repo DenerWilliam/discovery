@@ -56,3 +56,11 @@ def test_detects_jet_platform_by_header_and_asset_domain():
     by_name = {d["nome"]: d for d in found}
     assert "Jet e-commerce (Plataforma Neo)" in by_name and "Google Ads / DoubleClick" in by_name
     assert "cabeçalho: powered=jet-neo" in by_name["Jet e-commerce (Plataforma Neo)"]["evidencia"]
+
+
+def test_retries_transient_status(browser_context, serve):
+    browser_context.clear_cookies()
+    respostas = iter([("status", 503), ("status", 503), "<html><body>Oi</body></html>"])
+    base = serve({"/": lambda: next(respostas)})
+    src = collect_tecnologia(browser_context, base + "/")
+    assert src.status == OK and src.conteudo["detectadas"] == []

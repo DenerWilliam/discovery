@@ -73,3 +73,19 @@ def test_new_source_types_are_rendered_in_raw_md(tmp_path):
     assert "11222333000181 (matriz): UBERLANDIA/MG" in md
     assert "descartados por não citar o cliente: 17" in md
     assert json.loads((path / "raw.json").read_text())["fontes"][1]["tipo"] == "tecnologia"
+
+
+def test_motivo_and_archive_origin_are_rendered(tmp_path):
+    blocked = [
+        Source("site", "https://a/", FALHA, erro="HTTP 429", motivo="recusado"),
+        Source("site", "https://a/", OK, conteudo={
+            "titulo": "Home", "texto": "Olá", "origem": "arquivo",
+            "captura": "20260101000000", "url_snapshot": "https://web.archive.org/x"}),
+    ]
+    path = write_run(tmp_path, CLIENT, {}, blocked, T0, T0)
+    md = (path / "raw.md").read_text()
+    assert "- motivo: recusado" in md
+    assert "arquivo público (captura de 20260101000000)" in md
+    raw = json.loads((path / "raw.json").read_text())
+    assert raw["fontes"][0]["motivo"] == "recusado"
+    assert raw["fontes"][1]["conteudo"]["origem"] == "arquivo"

@@ -10,7 +10,15 @@ from urllib.parse import parse_qs, quote_plus, urlparse
 
 from playwright.sync_api import BrowserContext, Error as PlaywrightError
 
-from discovery.models import FALHA, NAO_COLETADA, OK, Source
+from discovery.collectors.resiliencia import (
+    FalhaTemporaria,
+    motivo_de_excecao,
+    motivo_de_status,
+    tentar,
+    transitorio,
+)
+from discovery.config import DEFAULT_LOCALE
+from discovery.models import FALHA, NAO_COLETADA, OK, RECUSADO, Source
 
 _BLOCK_MARKERS = ("anomaly-modal", "captcha", "unusual traffic")
 
@@ -127,7 +135,7 @@ class Engine:
 
 
 ENGINES = (
-    Engine("bing", "https://www.bing.com/search?q={q}&setlang=pt-BR", parse_bing, attempts=2),
+    Engine("bing", "https://www.bing.com/search?q={q}&setlang={locale}", parse_bing, attempts=2),
     Engine("duckduckgo", "https://html.duckduckgo.com/html/?q={q}", parse_ddg),
 )
 
@@ -141,7 +149,8 @@ def _mentions(results: list[dict], keyword: str | None) -> bool:
     return any(keyword in f"{r['titulo']} {r['url']} {r['trecho']}".lower() for r in results)
 
 
-def search_query(query: str, fetch: Fetch, engines=ENGINES, keyword: str | None = None) -> Source:
+def search_query(query: str, fetch: Fetch, engines=ENGINES, keyword: str | None = None,
+                 locale: str = DEFAULT_LOCALE) -> Source:
     """Tenta cada buscador em ordem; o primeiro com resultados que citam ``keyword`` vence.
 
     Sem nenhum resultado relacionado ao cliente (ex.: o buscador devolveu lixo), o
@@ -149,42 +158,57 @@ def search_query(query: str, fetch: Fetch, engines=ENGINES, keyword: str | None 
     buscador respondeu sem bloqueio e sem resultados.
     """
     problems: list[str] = []
+    motivos: set[str] = set()
     answered: str | None = None  # respondeu sem bloqueio, mas sem resultados
     for engine in engines:
-        url = engine.url.format(q=quote_plus(query))
+        url = engine.url.format(q=quote_plus(query), locale=locale)
         for _ in range(engine.attempts):
             try:
                 status, html = fetch(url)
-            except PlaywrightError as exc:
+            except (PlaywrightError, FalhaTemporaria) as exc:
                 problems.append(f"{engine.name}: {str(exc).splitlines()[0]}")
+                motivos.add(motivo_de_excecao(exc))
                 continue
             results = engine.parse(html) if status < 400 else []
             if _mentions(results, keyword):
                 return Source("busca", url, OK, conteudo={
-                    "query": query, "motor": engine.name, "resultados": results})
+                    "query": query, "motor": engine.name, "locale": locale,
+                    "resultados": results})
             if results:
                 problems.append(f"{engine.name}: resultados sem relação com o cliente")
             elif status >= 400 or status == 202 or looks_blocked(html):
                 problems.append(f"{engine.name}: bloqueado (HTTP {status})")
+                motivos.add(motivo_de_status(status) or RECUSADO)
             else:
                 answered = answered or engine.name
-    first_url = engines[0].url.format(q=quote_plus(query))
+    first_url = engines[0].url.format(q=quote_plus(query), locale=locale)
     if answered and not problems:
         return Source("busca", first_url, OK, conteudo={
-            "query": query, "motor": answered, "resultados": []})
+            "query": query, "motor": answered, "locale": locale, "resultados": []})
     return Source("busca", first_url, NAO_COLETADA, erro="; ".join(problems) or "sem resultados",
-                  conteudo={"query": query})
+                  motivo=RECUSADO if RECUSADO in motivos else (sorted(motivos)[0] if motivos else None),
+                  conteudo={"query": query, "locale": locale})
 
 
-def collect_searches(context: BrowserContext, queries: list[str], keyword: str | None = None) -> list[Source]:
+def collect_searches(context: BrowserContext, queries: list[str], keyword: str | None = None,
+                     locale: str = DEFAULT_LOCALE) -> list[Source]:
     page = context.new_page()
     page.set_default_timeout(20_000)
 
     def fetch(url: str) -> tuple[int, str]:
-        response = page.goto(url, wait_until="load")
-        return (response.status if response else 0), page.content()
+        def chamada() -> tuple[int, str]:
+            response = page.goto(url, wait_until="load")
+            status = response.status if response else 0
+            if transitorio(status):
+                raise FalhaTemporaria(status)
+            return status, page.content()
+
+        resultado, falha = tentar(chamada)
+        if falha is not None:
+            raise falha
+        return resultado
 
     try:
-        return [search_query(query, fetch, keyword=keyword) for query in queries]
+        return [search_query(query, fetch, keyword=keyword, locale=locale) for query in queries]
     finally:
         page.close()

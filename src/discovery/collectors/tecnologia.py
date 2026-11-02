@@ -6,8 +6,14 @@ from urllib.parse import urlparse
 
 from playwright.sync_api import BrowserContext, Error as PlaywrightError
 
+from discovery.collectors import arquivo
+from discovery.collectors.resiliencia import (
+    FalhaTemporaria,
+    motivo_de_excecao,
+    tentar,
+)
 from discovery.collectors.signatures import SIGNATURES
-from discovery.models import FALHA, OK, Source
+from discovery.models import FALHA, OK, RECUSADO, Source
 
 PAGE_TIMEOUT_MS = 20_000
 MAX_REQUESTS = 500
@@ -42,12 +48,14 @@ def detect(html: str, request_urls: list[str], cookies: list[str], headers: dict
     return found
 
 
-def collect_tecnologia(context: BrowserContext, site: str) -> Source:
+def _capturar(context: BrowserContext, site: str,
+              requested: list[str]) -> tuple[dict[str, str], str]:
+    # Uma página por tentativa: reutilizar a página depois de uma navegação que
+    # falhou trava o fechamento no Playwright síncrono.
     page = context.new_page()
     page.set_default_timeout(PAGE_TIMEOUT_MS)
-    requested: list[str] = []
     page.on("request", lambda request: requested.append(request.url) if len(requested) < MAX_REQUESTS else None)
-    host = (urlparse(site).hostname or "").lower().removeprefix("www.")
+    navegou = False
     try:
         # "load" pode nunca disparar em sites com muitos recursos externos; o DOM mais
         # uma janela curta de rede ociosa bastam para ver scripts, cookies e cabeçalhos.
@@ -56,16 +64,38 @@ def collect_tecnologia(context: BrowserContext, site: str) -> Source:
             page.wait_for_load_state("networkidle", timeout=6_000)
         except PlaywrightError:
             pass
-        if response is None or response.status >= 400:
-            raise PlaywrightError(f"HTTP {response.status if response else 'sem resposta'}")
-        headers = response.all_headers()
-        html = page.content()
-        cookies = [c["name"] for c in context.cookies()
-                   if c["domain"].lstrip(".").removeprefix("www.").endswith(host) or host.endswith(c["domain"].lstrip("."))]
-    except PlaywrightError as exc:
-        return Source("tecnologia", site, FALHA, erro=str(exc).splitlines()[0])
+        if response is None:
+            raise PlaywrightError("sem resposta")
+        if response.status >= 400:
+            raise FalhaTemporaria(response.status)
+        navegou = True
+        return response.all_headers(), page.content()
     finally:
-        page.close()
+        if navegou:
+            page.close()
+
+
+def collect_tecnologia(context: BrowserContext, site: str) -> Source:
+    host = (urlparse(site).hostname or "").lower().removeprefix("www.")
+    requested: list[str] = []
+    captura, falha = tentar(lambda: _capturar(context, site, requested))
+    if falha is not None:
+        motivo = motivo_de_excecao(falha)
+        if motivo == RECUSADO:
+            achado = arquivo.home(host)
+            if achado is not None:
+                data_captura, html_arquivado = achado
+                return Source("tecnologia", site, OK, conteudo={
+                    "detectadas": detect(html_arquivado, [], [], {}),
+                    "dominios_contatados": [],
+                    "origem": "arquivo",
+                    "captura": data_captura,
+                })
+        return Source("tecnologia", site, FALHA,
+                      erro=str(falha).splitlines()[0], motivo=motivo)
+    headers, html = captura
+    cookies = [c["name"] for c in context.cookies()
+               if c["domain"].lstrip(".").removeprefix("www.").endswith(host) or host.endswith(c["domain"].lstrip("."))]
 
     domains = sorted({urlparse(u).netloc for u in requested if urlparse(u).scheme in ("http", "https")})
     return Source("tecnologia", site, OK, conteudo={
